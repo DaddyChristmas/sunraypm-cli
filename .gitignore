@@ -1,0 +1,18 @@
+# Binaries
+sunray
+sunraypm
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test & coverage
+*.out
+*.test
+
+# IDEs & OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
