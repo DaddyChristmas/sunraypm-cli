@@ -1,123 +1,75 @@
 # sunRayPM CLI (`sunraypm`)
 
-> Fast, lightweight, standalone terminal client & ASCII visualizer for **[sunRayPM](https://sunraypm.com)**.
+> Fast, lightweight, standalone Unix-standard terminal client & institutional management tool for **[sunRayPM](https://sunraypm.com)**.
 
 [![Go Version](https://img.shields.io/badge/go-1.22+-blue.svg)](https://golang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
-## Quick Install
+## 🚀 Quick Install
 
-Install instantly via the terminal installer:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/DaddyChristmas/sunraypm-cli/main/install.sh | bash
-```
-
-Or install with Go:
-
+### Via Go
 ```bash
 go install github.com/DaddyChristmas/sunraypm-cli@latest
 ```
 
----
-
-## Visualizer Commands (Programmer Tools)
-
-### 1. ASCII Kanban Board
-Render a live 3-column Kanban board right inside your terminal:
+### Via Binary Installer
 ```bash
-sunray /draw-kanban @task
-# or scoped to a container:
-sunray /draw-kanban @containerxyz
+curl -fsSL https://raw.githubusercontent.com/DaddyChristmas/sunraypm-cli/main/install.sh | bash
 ```
 
-```text
-[sunRayPM] Terminal Kanban Board • Total: 9 tasks
+---
 
-=== [ ] TO DO (3) =========================================
-  ┌─ @e41a82f9 Implement OAuth2 Refresh
-  │  Dur:  3d  •  Cost: $ 600  •  [░░░░░░░░░░]   0%
+## 💻 Unix Filesystem Workflow
+
+sunRayPM CLI treats your nested workspace hierarchy like a virtual POSIX filesystem.
+
+```text
+sunray [TÜBİTAK]❯ pwd
+/sunRayPM Ltd./TÜBİTAK/@Backend Architecture
+
+sunray [TÜBİTAK]❯ ls -kb
+[sunRayPM] Terminal Kanban Board • Total: 7 tasks
+
+=== [ ] TO DO (2) =========================================
+  ┌─ @10c2e3 Beta Launch Milestone
+  │  Dur:  0d  •  Cost: $ 0    •  [░░░░░░░░░░]   0%
   └─────────────────────────────────────────────────────
 
-=== [~] IN PROGRESS (4) ===================================
-  ┌─ @8f2b10a1 Database DAG CTE Engine
-  │  Dur:  5d  •  Cost: $1200  •  [██████░░░░]  60%
+=== [~] IN PROGRESS (3) ===================================
+  ┌─ @0dca36 Implement OAuth2 Refresh
+  │  Dur:  3d  •  Cost: $ 600  •  [██████░░░░]  60%
   └─────────────────────────────────────────────────────
 
 === [x] DONE (2) =========================================
-  ┌─ @10c2e399 Landing Page Revamp
-  │  Dur:  2d  •  Cost: $ 400  •  [██████████] 100%
+  ┌─ @8f2b10 Database DAG CTE Engine
+  │  Dur:  5d  •  Cost: $1200  •  [██████████] 100%
   └─────────────────────────────────────────────────────
-```
-
-### 2. ASCII Gantt Schedule Timeline
-Render a horizontal Gantt chart in the console:
-```bash
-sunray /draw-gantt @space
-```
-
-```text
-[sunRayPM] Terminal Gantt Timeline (Tasks: 4)
-
- TASK / CONTAINER         | Days (1 to 20)
- ------------------------ | 01  03  05  07  09  11  13  15  17  19
---------------------------+-----------------------------------------
-@e41a82 Implement Auth    | [========>]
-@8f2b10 Backend DAG CTE   |       [===================>]
-@10c2e3 Landing Page      |             [========>]
-@99ef01 Launch Milestone  |                   [M] (Milestone)
---------------------------+-----------------------------------------
-```
-
-### 3. Container & Subtask Tree Hierarchy
-```bash
-sunray /draw-tree @parent
-```
-
-```text
-[sunRayPM] Container & Task Tree Structure
-
-└── [C] Backend Redesign (@8f2b10 - 45%)
-    ├── [T] Database Schema (@e41a82 - 100%)
-    ├── [T] API Endpoints (@99ef01 - 30%)
-    └── [M] v1.0 Launch (@10c2e3 - 0%)
-```
-
-### 4. Sunny Mascot & Daily Companion
-```bash
-sunray /sunny
-```
-
-```text
-      \   /
-       .-.         Sunny (Project Companion):
-    ― ( O O ) ―    "Keep crushing your sprint milestones!"
-       `-´         Workspace Status: 12 Completed • 4 In Flight
-      /   \        Tip: Use 'sunray draw-kanban' or '/draw-gantt' for terminal charts!
 ```
 
 ---
 
-## Interactive REPL Shell
+## 🎯 Fuzzy Task Reference Selector (`@`)
 
-Launch an interactive shell with native raw terminal mode (Up/Down history, Tab autocompletion, prompt protection, and live terminal card previews):
+Like modern developer command interfaces, typing `@` or pressing `Tab` inside the interactive shell pops up an interactive task selector box displaying short IDs, types, live progress bars, status badges, and costs:
 
-```bash
-sunray repl
+```text
+sunray [TÜBİTAK]❯ @
+  ┌── Select Task Reference (@...) ─────────────────────────────────────────────
+  │  REF        TYPE TITLE                      PROGRESS       STATUS         
+  ├───────────────────────────────────────────────────────────────────────────
+  │  @0dca36    [T]  Implement OAuth2 Refresh   [ 60%]         [~] IN PROGRESS
+  │  @8f2b10    [C]  Backend Architecture       [100%]         [x] DONE       
+  │  @10c2e3    [M]  Beta Launch Milestone      [  0%]         [ ] TO DO      
+  └───────────────────────────────────────────────────────────────────────────
 ```
 
-Inside the REPL:
-```text
-[sunRayPM] Interactive REPL Shell
-Connected to: https://sunraypm.com
-Active Space: spc_99812401
+Typing a specific task reference (e.g. `@0dca36` or `cat @0dca36`) renders the full task inspection card:
 
-sunray❯ @auth
-Matching Tasks (1 found):
-   ┌── @e41a82f9 ──────────────────────────────────────────────
-   │ Implement Auth
+```text
+   ┌── @0dca36 ──────────────────────────────────────────────
+   │ Implement OAuth2 Refresh
    │ Status:   [IN PROGRESS]  Progress: [██████░░░░] (60%)
    │ Duration: 3d  •  Cost: $600
    │ Dates:    2026-09-24 → 2026-09-27
@@ -126,39 +78,66 @@ Matching Tasks (1 found):
 
 ---
 
-## 🛠️ CLI Command Reference
+## 🛠️ Complete Command Reference
 
+### 1. Navigation & Virtual Filesystem
 | Command | Syntax | Description |
 | :--- | :--- | :--- |
-| **Auth Login**  | `sunray auth login` (or `sunray login`) | Authenticate via default browser |
-| **Auth Logout** | `sunray auth logout` | Remove stored credentials |
-| **Auth Status** | `sunray auth status` | View active user and space status |
-| **Spaces** | `sunray spaces list` | List all accessible workspaces |
-| **Tasks List** | `sunray tasks list --space-id <ID>` | List tasks with progress & cost metrics |
-| **Tasks Create**| `sunray tasks create --space-id <ID> --name "Task" --duration 3` | Create new container or task |
-| **Tasks Update**| `sunray tasks update @task --progress 80` | Update task progress / duration |
-| **Tasks Delete**| `sunray tasks delete @task` | Delete task |
-| **Dependencies**| `sunray deps add --pred @t1 --succ @t2` | Create DAG dependency edge |
-| **EVM Metrics** | `sunray evm --space-id <ID>` | Calculate BAC, PV, EV, AC, CPI, SPI |
-| **Executive Report**| `sunray report --space-id <ID>` | Generate formatted Markdown audit report |
-| **Self-Update** | `sunray update` (or `sunray upgrade`) | Upgrade CLI to latest release |
-| **Kanban Draw** | `sunray /draw-kanban [@container]` | Render 3-column ASCII Kanban |
-| **Gantt Draw**  | `sunray /draw-gantt [@container]` | Render ASCII Gantt timeline |
-| **Tree Draw**   | `sunray /draw-tree [@container]` | Render ASCII task hierarchy |
-| **Sunny Mascot**| `sunray /sunny` | Project pet companion status |
+| **`pwd`** | `pwd` | Print active hierarchical DAG breadcrumb path (`/Org/Space/@Parent`) |
+| **`cd`** | `cd <@space|@container|..|/>` | Navigate into workspace, container, parent level (`..`), or root (`/`) |
+| **`ls`** | `ls [-kb|-gnt|-tree]` | List items in tabular, Kanban (`-kb`), Gantt (`-gnt`), or Tree (`-tree`) view |
+| **`cat`** | `cat <@task>` | Inspect full task metadata card with progress, assignees, dates, and cost |
+
+### 2. Item & Container CRUD Operations
+| Command | Syntax | Description |
+| :--- | :--- | :--- |
+| **`touch`** | `touch "Title" [-d <days>] [-c <cost>]` | Create new task in active container/workspace |
+| **`mkdir`** | `mkdir "Title" [-m]` | Create new container or milestone (`-m`) |
+| **`mv`** | `mv <@task> <@dest_parent|"New Title">` | Reparent task to another container or rename |
+| **`cp`** | `cp <@task> ["New Title"]` | Duplicate / clone task |
+| **`rm`** | `rm [-r] <@task>` | Delete task or recursively delete container branch (`-r`) |
+| **`ln`** | `ln <@pred> <@succ>` | Link DAG dependency edge |
+| **`done`** | `done <@task>` | Quickly mark task 100% completed |
+| **`chmod`** | `chmod <0-100> <@task>` | Set task progress percentage |
+| **`echo`** | `echo "note" >> <@task>` | Append note or description to task |
+
+### 3. Institutional Management & Analytics
+| Command | Syntax | Description |
+| :--- | :--- | :--- |
+| **`evm`** / **`df`** | `evm` | Real-time Earned Value Management (BAC, PV, EV, AC, CPI, SPI, EAC, VAC) |
+| **`scurve`** | `scurve` | Render cumulative spend and schedule delivery trajectory curve |
+| **`mbe`** | `mbe [-t <tolerance_pct>]` | Management by Exception triage (flags tasks breaching variance threshold) |
+| **`cpm`** | `cpm` | Determine and highlight the Critical Path delivery sequence |
+| **`sprint`** | `sprint` | Active sprint workload, velocity, and health |
+| **`burndown`** | `burndown` | ASCII sprint burndown trajectory chart |
+| **`raci`** | `raci <@container>` | Render RACI Responsibility Assignment Matrix |
+| **`audit`** / **`report`** | `report` | Generate 1-Click Executive Markdown project report |
+
+### 4. Search, Utilities & Diagnostics
+| Command | Syntax | Description |
+| :--- | :--- | :--- |
+| **`grep`** | `grep <query>` | Search tasks and descriptions by keyword |
+| **`find`** | `find . [-type task] [-overdue]` | Filter tasks by attributes |
+| **`head`** / **`tail`** | `head [-n 5]` / `tail` | View top or latest tasks |
+| **`wc`** | `wc` | Print count of items, total duration days, and total budget |
+| **`top`** / **`sunny`** | `top` / `sunny` | Live workspace dashboard and companion mascot status |
+| **`cal`** | `cal` | Terminal calendar highlighting configured working days |
+| **`whoami`** / **`ping`** | `whoami` / `ping` | View logged-in account, active workspace, and API latency |
+| **`login`** / **`logout`** | `login` / `logout` | Browser authentication and credential cleanup |
+| **`update`** | `update` | Self-updater for latest release |
 
 ---
 
-## ⚙️ Configuration
+## ⚙️ Configuration & Environment
 
-Credentials are automatically saved to `~/.sunray/config.json` when running `sunray auth login`.
+Credentials are automatically stored in `~/.sunraypm/config.json`.
 
-You can also configure via environment variables:
+You can also override settings via environment variables:
 
 ```bash
-export SUNRAY_API_URL="https://api.sunraypm.com" # Default: https://api.sunraypm.com
-export SUNRAY_TOKEN="<your_zitadel_jwt_token>"
-export SUNRAY_SPACE_ID="<default_space_id>"
+export SUNRAYPM_API_URL="https://api.sunraypm.com" # Default: https://api.sunraypm.com
+export SUNRAYPM_TOKEN="<your_jwt_token>"
+export SUNRAYPM_SPACE_ID="<default_space_id>"
 ```
 
 ---
@@ -166,4 +145,4 @@ export SUNRAY_SPACE_ID="<default_space_id>"
 ## 📄 License & Intellectual Property
 
 - This client utility (`sunraypm-cli`) is open source under the **MIT License**.
-- **sunRayPM** and the core sunRayPM cloud platform, scheduling engines, server architecture, and proprietary algorithms are Copyright © 2026 sunRayPM (DaddyChristmas). All rights reserved.
+- **sunRayPM** and the core sunRayPM cloud platform, scheduling engines, and server architecture are Copyright © 2026 sunRayPM (DaddyChristmas). All rights reserved.
