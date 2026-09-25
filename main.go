@@ -259,40 +259,54 @@ func makeRequest(cfg Config, method, path string, body interface{}) ([]byte, err
 // ─── DATA RESOLVERS ─────────────────────────────────────────────────────────
 
 func fetchAllSpaces(cfg Config) ([]SpaceInfo, error) {
+	// 1. Direct query to user's authorized spaces across all tenants
+	userData, err := makeRequest(cfg, "GET", "/api/user/spaces", nil)
+	if err == nil {
+		var spaces []SpaceInfo
+		if err := json.Unmarshal(userData, &spaces); err == nil && len(spaces) > 0 {
+			return spaces, nil
+		}
+	}
+
+	// 2. Fallback: iterate over user's organizations/tenants
 	tenantData, err := makeRequest(cfg, "GET", "/api/tenants", nil)
 	if err != nil {
 		return nil, err
 	}
 
+	var tenantList []map[string]interface{}
 	var tenantResp struct {
-		Data []map[string]interface{} `json:"data"`
+		Tenants []map[string]interface{} `json:"tenants"`
+		Data    []map[string]interface{} `json:"data"`
 	}
-	_ = json.Unmarshal(tenantData, &tenantResp)
+	if err := json.Unmarshal(tenantData, &tenantResp); err == nil {
+		if len(tenantResp.Tenants) > 0 {
+			tenantList = tenantResp.Tenants
+		} else if len(tenantResp.Data) > 0 {
+			tenantList = tenantResp.Data
+		}
+	}
+	if len(tenantList) == 0 {
+		_ = json.Unmarshal(tenantData, &tenantList)
+	}
 
 	var allSpaces []SpaceInfo
-	if len(tenantResp.Data) == 0 {
-		data, err := makeRequest(cfg, "GET", "/api/spaces", nil)
-		if err == nil {
-			_ = json.Unmarshal(data, &allSpaces)
+	for _, tenant := range tenantList {
+		tID, _ := tenant["id"].(string)
+		tName, _ := tenant["name"].(string)
+		if tID == "" {
+			continue
 		}
-	} else {
-		for _, tenant := range tenantResp.Data {
-			tID, _ := tenant["id"].(string)
-			tName, _ := tenant["name"].(string)
-			if tID == "" {
-				continue
-			}
-			spacesData, err := makeRequest(cfg, "GET", fmt.Sprintf("/api/spaces?tenant_id=%s", tID), nil)
-			if err != nil {
-				continue
-			}
-			var spaces []SpaceInfo
-			if err := json.Unmarshal(spacesData, &spaces); err == nil {
-				for _, s := range spaces {
-					s.TenantName = tName
-					s.TenantID = tID
-					allSpaces = append(allSpaces, s)
-				}
+		spacesData, err := makeRequest(cfg, "GET", fmt.Sprintf("/api/spaces?tenant_id=%s", tID), nil)
+		if err != nil {
+			continue
+		}
+		var spaces []SpaceInfo
+		if err := json.Unmarshal(spacesData, &spaces); err == nil {
+			for _, s := range spaces {
+				s.TenantName = tName
+				s.TenantID = tID
+				allSpaces = append(allSpaces, s)
 			}
 		}
 	}
