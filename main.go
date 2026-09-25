@@ -52,7 +52,7 @@ const (
 	colorGray   = "\033[90m"
 )
 
-const AppVersion = "v0.1.0"
+const AppVersion = "v0.2.0"
 
 // Config holds CLI configuration persisted in ~/.sunraypm/config.json
 type Config struct {
@@ -1333,7 +1333,7 @@ func handleCal() {
 			fmt.Println()
 		}
 	}
-	fmt.Println("\n")
+	fmt.Println()
 }
 
 func handlePing(cfg Config) {
@@ -1525,7 +1525,8 @@ func handleBurndown(cfg Config, spaceID string) {
 	fmt.Println("  Day 07 (Mid)   | [============]          60% (24d)")
 	fmt.Println("  Day 10         | [========]              40% (16d)")
 	fmt.Println("  Day 14 (Goal)  | [==]                    10% (4d)")
-	fmt.Println(" ────────────────+─────────────────────────────────────────\n")
+	fmt.Println(" ────────────────+─────────────────────────────────────────")
+	fmt.Println()
 }
 
 func handleRACI(cfg Config, pctx *PathContext, taskRef string) {
@@ -1548,7 +1549,8 @@ func handleRACI(cfg Config, pctx *PathContext, taskRef string) {
 	fmt.Println("  Responsible (R):  Assignee Lead")
 	fmt.Println("  Accountable (A):  Workspace Owner")
 	fmt.Println("  Consulted   (C):  Engineering Team")
-	fmt.Println("  Informed    (I):  Executive Stakeholders\n")
+	fmt.Println("  Informed    (I):  Executive Stakeholders")
+	fmt.Println()
 }
 
 func handleMan(cmd string) {
