@@ -1502,7 +1502,7 @@ func handleMan(cmd string) {
 
 // ─── LEGACY & COMPATIBILITY CLI HANDLERS ────────────────────────────────────
 
-func handleAuthLogin(cfg Config) {
+func handleAuthLogin(cfg *Config, pctx *PathContext) {
 	fmt.Printf("\n%s[sunRayPM] Browser Authentication%s\n", colorGold+colorBold, colorReset)
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -1587,11 +1587,32 @@ func handleAuthLogin(cfg Config) {
 		if res.Email != "" {
 			cfg.UserEmail = res.Email
 		}
-		_ = saveConfig(cfg)
+		_ = saveConfig(*cfg)
+
+		if pctx != nil {
+			if spaces, err := fetchAllSpaces(*cfg); err == nil && len(spaces) > 0 {
+				if cfg.SpaceID != "" {
+					for _, s := range spaces {
+						if s.ID == cfg.SpaceID {
+							pctx.ActiveSpace = &s
+							break
+						}
+					}
+				}
+				if pctx.ActiveSpace == nil {
+					pctx.ActiveSpace = &spaces[0]
+					cfg.SpaceID = spaces[0].ID
+					_ = saveConfig(*cfg)
+				}
+			}
+		}
 
 		fmt.Printf("\n%s[OK] Authentication successful!%s\n", colorGreen+colorBold, colorReset)
 		if cfg.UserEmail != "" {
 			fmt.Printf("Logged in as: %s%s%s\n", colorBold, cfg.UserEmail, colorReset)
+		}
+		if pctx != nil && pctx.ActiveSpace != nil {
+			fmt.Printf("Active Workspace: %s%s%s (@%s)\n", colorGold, pctx.ActiveSpace.Name, colorReset, pctx.ActiveSpace.ID)
 		}
 		fmt.Printf("Credentials saved to: %s\n\n", getConfigFile())
 
@@ -1603,9 +1624,18 @@ func handleAuthLogin(cfg Config) {
 	}
 }
 
-func handleAuthLogout() {
+func handleAuthLogout(cfg *Config, pctx *PathContext) {
 	file := getConfigFile()
 	_ = os.Remove(file)
+	if cfg != nil {
+		cfg.Token = ""
+		cfg.SpaceID = ""
+		cfg.UserEmail = ""
+	}
+	if pctx != nil {
+		pctx.ActiveSpace = nil
+		pctx.ActiveParent = nil
+	}
 	fmt.Printf("%s[OK] Logged out successfully.%s Saved credentials removed.\n", colorGreen, colorReset)
 }
 
@@ -2413,16 +2443,16 @@ func executeREPLCommand(cfg *Config, pctx *PathContext, input string) {
 	// Authentication & System
 	case "auth":
 		if len(args) > 1 && args[1] == "logout" {
-			handleAuthLogout()
+			handleAuthLogout(cfg, pctx)
 		} else if len(args) > 1 && args[1] == "status" {
 			handleAuthStatus(*cfg)
 		} else {
-			handleAuthLogin(*cfg)
+			handleAuthLogin(cfg, pctx)
 		}
 	case "login":
-		handleAuthLogin(*cfg)
+		handleAuthLogin(cfg, pctx)
 	case "logout":
-		handleAuthLogout()
+		handleAuthLogout(cfg, pctx)
 	case "status":
 		handleAuthStatus(*cfg)
 	case "update", "upgrade":
@@ -2505,11 +2535,11 @@ func parseCommandLine(input string) []string {
 	return args
 }
 
-func startFallbackREPL(cfg Config) {
+func startFallbackREPL(cfg *Config) {
 	scanner := bufio.NewScanner(os.Stdin)
 	pctx := &PathContext{}
 	if cfg.SpaceID != "" {
-		if spaces, err := fetchAllSpaces(cfg); err == nil {
+		if spaces, err := fetchAllSpaces(*cfg); err == nil {
 			for _, s := range spaces {
 				if s.ID == cfg.SpaceID {
 					pctx.ActiveSpace = &s
@@ -2524,14 +2554,14 @@ func startFallbackREPL(cfg Config) {
 		if input == "" || input == "exit" || input == "quit" {
 			break
 		}
-		executeREPLCommand(&cfg, pctx, input)
+		executeREPLCommand(cfg, pctx, input)
 	}
 }
 
-func startInteractiveREPL(cfg Config) {
+func startInteractiveREPL(cfg *Config) {
 	pctx := &PathContext{}
 	if cfg.SpaceID != "" {
-		if spaces, err := fetchAllSpaces(cfg); err == nil {
+		if spaces, err := fetchAllSpaces(*cfg); err == nil {
 			for _, s := range spaces {
 				if s.ID == cfg.SpaceID {
 					pctx.ActiveSpace = &s
@@ -2587,7 +2617,7 @@ func startInteractiveREPL(cfg Config) {
 			// cd / spaces autocompletion
 			if strings.HasPrefix(trimmed, "cd ") {
 				query := strings.TrimSpace(strings.TrimPrefix(trimmed, "cd "))
-				spaces, _ := fetchAllSpaces(cfg)
+				spaces, _ := fetchAllSpaces(*cfg)
 				var matches []string
 				for _, s := range spaces {
 					if strings.HasPrefix(strings.ToLower(s.Name), strings.ToLower(query)) || strings.HasPrefix(strings.ToLower(s.ID), strings.ToLower(query)) {
@@ -2614,7 +2644,7 @@ func startInteractiveREPL(cfg Config) {
 					spaceID = pctx.ActiveSpace.ID
 				}
 				if spaceID != "" {
-					tasks, _ := fetchSpaceTasks(cfg, spaceID)
+					tasks, _ := fetchSpaceTasks(*cfg, spaceID)
 					var matches []string
 					for _, task := range tasks {
 						shortID := task.ID
@@ -2673,7 +2703,7 @@ func startInteractiveREPL(cfg Config) {
 		}
 
 		term.Restore(fd, oldState)
-		executeREPLCommand(&cfg, pctx, input)
+		executeREPLCommand(cfg, pctx, input)
 		oldState, _ = term.MakeRaw(fd)
 	}
 }
@@ -2682,7 +2712,7 @@ func main() {
 	cfg := getConfig()
 
 	if len(os.Args) < 2 {
-		startInteractiveREPL(cfg)
+		startInteractiveREPL(&cfg)
 		return
 	}
 
