@@ -1699,7 +1699,11 @@ func handleUpdate() {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		fmt.Printf("%sNo public releases published on GitHub yet (or API rate limited).%s\n", colorYellow, colorReset)
+		fmt.Printf("%sNo published GitHub release binaries found for DaddyChristmas/sunraypm-cli yet.%s\n", colorYellow, colorReset)
+		fmt.Println("To install/update directly from source:")
+		fmt.Printf("  %sgo install github.com/DaddyChristmas/sunraypm-cli@latest%s\n\n", colorCyan, colorReset)
+		fmt.Println("To publish a release:")
+		fmt.Printf("  %sgit tag v0.1.0 && git push origin v0.1.0%s\n\n", colorGray, colorReset)
 		return
 	}
 
