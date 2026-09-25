@@ -52,7 +52,7 @@ const (
 	colorGray   = "\033[90m"
 )
 
-const AppVersion = "v0.1.0"
+const AppVersion = "v0.2.0"
 
 // Config holds CLI configuration persisted in ~/.sunraypm/config.json
 type Config struct {
