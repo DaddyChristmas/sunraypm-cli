@@ -484,6 +484,63 @@ func renderTaskPreviewBox(t Task) {
 	fmt.Printf("   └─────────────────────────────────────────────────────────\n")
 }
 
+func renderTaskOptionsBox(w io.Writer, tasks []Task) {
+	if len(tasks) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "\r\n  %s┌── Select Task Reference (@...) %s%s\r\n", colorGold, strings.Repeat("─", 45), colorReset)
+	fmt.Fprintf(w, "  │  %-10s %-4s %-26s %-12s %-14s\r\n", "REF", "TYPE", "TITLE", "PROGRESS", "STATUS")
+	fmt.Fprintf(w, "  ├%s\r\n", strings.Repeat("─", 74))
+
+	maxShow := 12
+	if len(tasks) < maxShow {
+		maxShow = len(tasks)
+	}
+
+	for i := 0; i < maxShow; i++ {
+		t := tasks[i]
+		idShort := t.ID
+		if len(idShort) > 8 {
+			idShort = idShort[:8]
+		}
+		ref := "@" + idShort
+
+		typeIcon := "[T]"
+		if t.Type == "milestone" {
+			typeIcon = "[M]"
+		} else if t.Type == "project" || t.Type == "kanban" {
+			typeIcon = "[C]"
+		}
+
+		title := t.DisplayTitle()
+		if len(title) > 24 {
+			title = title[:22] + ".."
+		}
+
+		prog := fmt.Sprintf("[%3.0f%%]", t.Progress)
+		if t.Progress >= 100 {
+			prog = fmt.Sprintf("%s[%3.0f%%]%s", colorGreen, t.Progress, colorReset)
+		} else if t.Progress > 0 {
+			prog = fmt.Sprintf("%s[%3.0f%%]%s", colorYellow, t.Progress, colorReset)
+		}
+
+		status := "[ ] TO DO"
+		if t.Progress >= 100 {
+			status = fmt.Sprintf("%s[x] DONE%s", colorGreen, colorReset)
+		} else if t.Progress > 0 {
+			status = fmt.Sprintf("%s[~] IN PROGRESS%s", colorYellow, colorReset)
+		}
+
+		fmt.Fprintf(w, "  │  %s%-10s%s %-4s %-26s %-21s %s\r\n", colorCyan, ref, colorReset, typeIcon, title, prog, status)
+	}
+
+	if len(tasks) > maxShow {
+		fmt.Fprintf(w, "  │  %s... and %d more tasks%s\r\n", colorGray, len(tasks)-maxShow, colorReset)
+	}
+
+	fmt.Fprintf(w, "  %s└%s%s\r\n\r\n", colorGold, strings.Repeat("─", 74), colorReset)
+}
+
 func minInt(a, b int) int {
 	if a < b {
 		return a
@@ -2271,11 +2328,10 @@ func executeREPLCommand(cfg *Config, pctx *PathContext, input string) {
 		matches := filterTasksByQuery(input, tasks)
 		if len(matches) == 0 {
 			fmt.Printf("%sNo tasks matching '%s'%s\n", colorGray, input, colorReset)
+		} else if len(matches) == 1 {
+			renderTaskPreviewBox(matches[0])
 		} else {
-			fmt.Printf("\n%sMatching Tasks (%d found):%s\n", colorGold, len(matches), colorReset)
-			for _, m := range matches {
-				renderTaskPreviewBox(m)
-			}
+			renderTaskOptionsBox(os.Stdout, matches)
 		}
 		return
 	}
@@ -2672,21 +2728,34 @@ func startInteractiveREPL(cfg *Config) {
 				}
 				if spaceID != "" {
 					tasks, _ := fetchSpaceTasks(*cfg, spaceID)
-					var matches []string
+					var matchedTasks []Task
+					var matchedRefs []string
+					cleanQuery := strings.ToLower(strings.TrimPrefix(taskQuery, "@"))
+
 					for _, task := range tasks {
 						shortID := task.ID
 						if len(shortID) > 8 {
 							shortID = shortID[:8]
 						}
 						refID := "@" + shortID
-						if strings.HasPrefix(strings.ToLower(refID), strings.ToLower(taskQuery)) {
-							matches = append(matches, refID)
+						if cleanQuery == "" || strings.HasPrefix(strings.ToLower(shortID), cleanQuery) || strings.Contains(strings.ToLower(task.DisplayTitle()), cleanQuery) {
+							matchedTasks = append(matchedTasks, task)
+							matchedRefs = append(matchedRefs, refID)
 						}
 					}
-					if len(matches) == 1 {
+
+					if len(matchedRefs) == 1 {
 						prefix := trimmed[:atIdx]
-						res := prefix + matches[0] + " "
+						res := prefix + matchedRefs[0] + " "
 						return res, len(res), true
+					} else if len(matchedRefs) > 1 {
+						renderTaskOptionsBox(terminal, matchedTasks)
+						lcp := longestCommonPrefix(matchedRefs)
+						if len(lcp) > len(taskQuery) {
+							prefix := trimmed[:atIdx]
+							return prefix + lcp, len(prefix+lcp), true
+						}
+						return line, pos, false
 					}
 				}
 			}
