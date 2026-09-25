@@ -54,7 +54,7 @@ const (
 
 const AppVersion = "v0.1.0"
 
-// Config holds CLI configuration persisted in ~/.sunray/config.json
+// Config holds CLI configuration persisted in ~/.sunraypm/config.json
 type Config struct {
 	BaseURL   string `json:"base_url"`
 	Token     string `json:"token"`
@@ -141,9 +141,20 @@ func getConfigFile() string {
 	if err != nil {
 		home = "."
 	}
-	dir := filepath.Join(home, ".sunray")
+	dir := filepath.Join(home, ".sunraypm")
 	_ = os.MkdirAll(dir, 0700)
-	return filepath.Join(dir, "config.json")
+
+	newFile := filepath.Join(dir, "config.json")
+
+	// Automatically migrate legacy ~/.sunray/config.json if existing
+	legacyFile := filepath.Join(home, ".sunray", "config.json")
+	if _, err := os.Stat(newFile); os.IsNotExist(err) {
+		if legData, err := os.ReadFile(legacyFile); err == nil {
+			_ = os.WriteFile(newFile, legData, 0600)
+		}
+	}
+
+	return newFile
 }
 
 func loadStoredConfig() Config {
@@ -172,13 +183,21 @@ func saveConfig(cfg Config) error {
 
 func getConfig() Config {
 	cfg := loadStoredConfig()
-	if envURL := os.Getenv("SUNRAY_API_URL"); envURL != "" {
+	if envURL := os.Getenv("SUNRAYPM_API_URL"); envURL != "" {
+		cfg.BaseURL = envURL
+	} else if envURL := os.Getenv("SUNRAY_API_URL"); envURL != "" {
 		cfg.BaseURL = envURL
 	}
-	if envToken := os.Getenv("SUNRAY_TOKEN"); envToken != "" {
+
+	if envToken := os.Getenv("SUNRAYPM_TOKEN"); envToken != "" {
+		cfg.Token = envToken
+	} else if envToken := os.Getenv("SUNRAY_TOKEN"); envToken != "" {
 		cfg.Token = envToken
 	}
-	if envSpace := os.Getenv("SUNRAY_SPACE_ID"); envSpace != "" {
+
+	if envSpace := os.Getenv("SUNRAYPM_SPACE_ID"); envSpace != "" {
+		cfg.SpaceID = envSpace
+	} else if envSpace := os.Getenv("SUNRAY_SPACE_ID"); envSpace != "" {
 		cfg.SpaceID = envSpace
 	}
 	return cfg
@@ -1627,6 +1646,10 @@ func handleAuthLogin(cfg *Config, pctx *PathContext) {
 func handleAuthLogout(cfg *Config, pctx *PathContext) {
 	file := getConfigFile()
 	_ = os.Remove(file)
+	if home, err := os.UserHomeDir(); err == nil {
+		_ = os.Remove(filepath.Join(home, ".sunray", "config.json"))
+		_ = os.Remove(filepath.Join(home, ".sunray"))
+	}
 	if cfg != nil {
 		cfg.Token = ""
 		cfg.SpaceID = ""
