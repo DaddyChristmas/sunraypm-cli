@@ -26,24 +26,24 @@ curl -fsSL https://raw.githubusercontent.com/DaddyChristmas/sunraypm-cli/main/in
 sunRayPM CLI treats your nested workspace hierarchy like a virtual POSIX filesystem.
 
 ```text
-sunray [TÜBİTAK]❯ pwd
-/sunRayPM Ltd./TÜBİTAK/@Backend Architecture
+sunray [SunRay Aerospace]❯ pwd
+/SunRay Technologies/Orbital Spacecraft/@Propulsion Stage
 
-sunray [TÜBİTAK]❯ ls -kb
+sunray [SunRay Aerospace]❯ ls -kb
 [sunRayPM] Terminal Kanban Board • Total: 7 tasks
 
 === [ ] TO DO (2) =========================================
-  ┌─ @10c2e3 Beta Launch Milestone
+  ┌─ @10c2e3 Orbital Launch Milestone
   │  Dur:  0d  •  Cost: $ 0    •  [░░░░░░░░░░]   0%
   └─────────────────────────────────────────────────────
 
 === [~] IN PROGRESS (3) ===================================
-  ┌─ @0dca36 Implement OAuth2 Refresh
+  ┌─ @0dca36 Avionics Firmware Telemetry
   │  Dur:  3d  •  Cost: $ 600  •  [██████░░░░]  60%
   └─────────────────────────────────────────────────────
 
 === [x] DONE (2) =========================================
-  ┌─ @8f2b10 Database DAG CTE Engine
+  ┌─ @8f2b10 Rocket Engine Stage 1 Static Fire
   │  Dur:  5d  •  Cost: $1200  •  [██████████] 100%
   └─────────────────────────────────────────────────────
 ```
@@ -55,13 +55,13 @@ sunray [TÜBİTAK]❯ ls -kb
 Like modern developer command interfaces, typing `@` or pressing `Tab` inside the interactive shell pops up an interactive task selector box displaying short IDs, types, live progress bars, status badges, and costs:
 
 ```text
-sunray [TÜBİTAK]❯ @
+sunray [SunRay Aerospace]❯ @
   ┌── Select Task Reference (@...) ─────────────────────────────────────────────
   │  REF        TYPE TITLE                      PROGRESS       STATUS         
   ├───────────────────────────────────────────────────────────────────────────
-  │  @0dca36    [T]  Implement OAuth2 Refresh   [ 60%]         [~] IN PROGRESS
-  │  @8f2b10    [C]  Backend Architecture       [100%]         [x] DONE       
-  │  @10c2e3    [M]  Beta Launch Milestone      [  0%]         [ ] TO DO      
+  │  @0dca36    [T]  Avionics Firmware Telemetry[ 60%]         [~] IN PROGRESS
+  │  @8f2b10    [C]  Propulsion Stage Engine    [100%]         [x] DONE       
+  │  @10c2e3    [M]  Orbital Launch Milestone   [  0%]         [ ] TO DO      
   └───────────────────────────────────────────────────────────────────────────
 ```
 
