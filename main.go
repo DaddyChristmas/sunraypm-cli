@@ -52,7 +52,7 @@ const (
 	colorGray   = "\033[90m"
 )
 
-const AppVersion = "v0.2.0"
+const AppVersion = "v0.2.1"
 
 // Config holds CLI configuration persisted in ~/.sunraypm/config.json
 type Config struct {
@@ -810,8 +810,10 @@ func handleTouch(cfg Config, pctx *PathContext, args []string) {
 		return
 	}
 	spaceID := ""
+	tenantID := ""
 	if pctx.ActiveSpace != nil {
 		spaceID = pctx.ActiveSpace.ID
+		tenantID = pctx.ActiveSpace.TenantID
 	}
 	if spaceID == "" {
 		fmt.Printf("%sPlease select a workspace first with:%s cd @workspace\n", colorYellow, colorReset)
@@ -838,6 +840,7 @@ func handleTouch(cfg Config, pctx *PathContext, args []string) {
 	}
 
 	payload := map[string]interface{}{
+		"tenant_id":     tenantID,
 		"space_id":      spaceID,
 		"title":         name,
 		"name":          name,
@@ -872,8 +875,10 @@ func handleMkdir(cfg Config, pctx *PathContext, args []string) {
 		return
 	}
 	spaceID := ""
+	tenantID := ""
 	if pctx.ActiveSpace != nil {
 		spaceID = pctx.ActiveSpace.ID
+		tenantID = pctx.ActiveSpace.TenantID
 	}
 	if spaceID == "" {
 		fmt.Printf("%sPlease select a workspace first with:%s cd @workspace\n", colorYellow, colorReset)
@@ -894,6 +899,7 @@ func handleMkdir(cfg Config, pctx *PathContext, args []string) {
 	}
 
 	payload := map[string]interface{}{
+		"tenant_id":     tenantID,
 		"space_id":      spaceID,
 		"title":         name,
 		"name":          name,
@@ -950,7 +956,7 @@ func handleMv(cfg Config, pctx *PathContext, srcRef, destRef string) {
 			return
 		}
 		payload := map[string]interface{}{
-			"parent_id": destParent.ID,
+			"new_parent_id": destParent.ID,
 		}
 		_, err := makeRequest(cfg, "POST", fmt.Sprintf("/api/containers/%s/reparent", srcTask.ID), payload)
 		if err != nil {
@@ -979,8 +985,10 @@ func handleCp(cfg Config, pctx *PathContext, srcRef, newName string) {
 		return
 	}
 	spaceID := ""
+	tenantID := ""
 	if pctx.ActiveSpace != nil {
 		spaceID = pctx.ActiveSpace.ID
+		tenantID = pctx.ActiveSpace.TenantID
 	}
 	tasks, err := fetchSpaceTasks(cfg, spaceID)
 	if err != nil {
@@ -1000,6 +1008,7 @@ func handleCp(cfg Config, pctx *PathContext, srcRef, newName string) {
 	}
 
 	payload := map[string]interface{}{
+		"tenant_id":     tenantID,
 		"space_id":      spaceID,
 		"title":         title,
 		"name":          title,
