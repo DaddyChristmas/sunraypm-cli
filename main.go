@@ -71,20 +71,25 @@ type SpaceInfo struct {
 }
 
 type Task struct {
-	ID           string   `json:"id"`
-	Title        string   `json:"title"`
-	Name         string   `json:"name"`
-	Description  string   `json:"description,omitempty"`
-	Type         string   `json:"type"`
-	Progress     float64  `json:"progress"`
-	DurationDays float64  `json:"duration_days"`
-	StartPlanned string   `json:"start_planned"`
-	FinishPlan   string   `json:"finish_planned"`
-	CostPlanned  float64  `json:"cost_planned"`
-	CostActual   float64  `json:"cost_actual"`
-	ParentID     *string  `json:"parent_id,omitempty"`
-	Assignees    []string `json:"assignees,omitempty"`
-	Predecessors []string `json:"predecessors,omitempty"`
+	ID                string   `json:"id"`
+	Title             string   `json:"title"`
+	Name              string   `json:"name"`
+	Description       string   `json:"description,omitempty"`
+	Type              string   `json:"type"`
+	Status            string   `json:"status,omitempty"`
+	Progress          float64  `json:"progress"`
+	DurationDays      float64  `json:"duration_days"`
+	StartDatePlanned  string   `json:"start_date_planned,omitempty"`
+	FinishDatePlanned string   `json:"finish_date_planned,omitempty"`
+	StartPlanned      string   `json:"start_planned,omitempty"`
+	FinishPlan        string   `json:"finish_planned,omitempty"`
+	StartDateActual   string   `json:"start_date_actual,omitempty"`
+	FinishDateActual  string   `json:"finish_date_actual,omitempty"`
+	CostPlanned       float64  `json:"cost_planned"`
+	CostActual        float64  `json:"cost_actual"`
+	ParentID          *string  `json:"parent_id,omitempty"`
+	Assignees         []string `json:"assignees,omitempty"`
+	Predecessors      []string `json:"predecessors,omitempty"`
 }
 
 func (t Task) DisplayTitle() string {
@@ -95,6 +100,26 @@ func (t Task) DisplayTitle() string {
 		return t.Name
 	}
 	return "Untitled"
+}
+
+func (t Task) PlannedStart() string {
+	if t.StartDatePlanned != "" {
+		return strings.Split(t.StartDatePlanned, "T")[0]
+	}
+	if t.StartPlanned != "" {
+		return strings.Split(t.StartPlanned, "T")[0]
+	}
+	return ""
+}
+
+func (t Task) PlannedFinish() string {
+	if t.FinishDatePlanned != "" {
+		return strings.Split(t.FinishDatePlanned, "T")[0]
+	}
+	if t.FinishPlan != "" {
+		return strings.Split(t.FinishPlan, "T")[0]
+	}
+	return ""
 }
 
 // PathContext tracks virtual filesystem breadcrumbs
@@ -1596,6 +1621,24 @@ func handleMan(cmd string) {
 	case "mbe":
 		fmt.Println("NAME: mbe - Management by Exception variance triage report")
 		fmt.Println("USAGE: mbe [-t <tolerance_percentage>]")
+	case "risk", "hml":
+		fmt.Println("NAME: risk - 8-signal predictive ML risk register & radar failure diagnostics")
+		fmt.Println("USAGE: risk [ls|top] | risk inspect <@task>")
+	case "workload", "load":
+		fmt.Println("NAME: workload - inspect team cognitive load indices & overload saturation")
+		fmt.Println("USAGE: workload")
+	case "dispatch", "ofp":
+		fmt.Println("NAME: dispatch - generate deterministic aviation-style operational task chain flight plan")
+		fmt.Println("USAGE: dispatch <@task>")
+	case "shift":
+		fmt.Println("NAME: shift - batch shift planned task schedules forward or backward by N days")
+		fmt.Println("USAGE: shift <+Nd|-Nd> <@task1> [@task2...]")
+	case "bulk":
+		fmt.Println("NAME: bulk - execute batch operations across multiple tasks simultaneously")
+		fmt.Println("USAGE: bulk <done|reopen|rm> <@task1> [@task2...]")
+	case "export":
+		fmt.Println("NAME: export - export space data or GDPR Article 20 data portability archive")
+		fmt.Println("USAGE: export [space|user] [--json|--md]")
 	default:
 		fmt.Printf("Manual entry for '%s' available. Type 'help' for full command list.\n", cmd)
 	}
@@ -2278,6 +2321,575 @@ func handleSunny(cfg Config, spaceID string) {
 	fmt.Println()
 }
 
+// ─── RISK & COGNITIVE ENGINE HANDLERS ────────────────────────────────────────
+
+type RiskRegisterSignal struct {
+	Criticality   float64 `json:"criticality"`
+	Slip          float64 `json:"slip"`
+	VelZ          float64 `json:"vel_z"`
+	Overdue       float64 `json:"overdue"`
+	ScopeComplete bool    `json:"scope_complete"`
+	CostOverrun   float64 `json:"cost_overrun"`
+	Stalls        int     `json:"stalls"`
+	Successors    int     `json:"successors"`
+}
+
+type RiskRegisterItem struct {
+	ContainerID string              `json:"container_id"`
+	RiskLevel   string              `json:"risk_level"`
+	Likelihood  float64             `json:"likelihood"`
+	Impact      float64             `json:"impact"`
+	ModelType   string              `json:"model_type"`
+	LGBMScore   *float64            `json:"lgbm_score"`
+	P80Finish   *string             `json:"p80_finish"`
+	Signals     RiskRegisterSignal  `json:"signals"`
+}
+
+type UserLoadItem struct {
+	UserID          string  `json:"user_id"`
+	UserName        string  `json:"user_name"`
+	TotalLoadIndex  float64 `json:"total_load_index"`
+	Overloaded      bool    `json:"overloaded"`
+	ActiveTaskCount int     `json:"active_task_count"`
+}
+
+type SpacePredictionData struct {
+	SpaceID      string `json:"space_id"`
+	ModelVersion string `json:"model_version"`
+	ComputedAt   string `json:"computed_at"`
+	Prediction   struct {
+		RiskRegister []RiskRegisterItem `json:"risk_register"`
+		UserLoads    []UserLoadItem     `json:"user_loads"`
+	} `json:"prediction"`
+	RiskRegister []RiskRegisterItem `json:"risk_register"`
+	UserLoads    []UserLoadItem     `json:"user_loads"`
+}
+
+func fetchSpacePrediction(cfg Config, spaceID string) (*SpacePredictionData, error) {
+	if spaceID == "" {
+		return nil, fmt.Errorf("no workspace selected")
+	}
+	data, err := makeRequest(cfg, "GET", fmt.Sprintf("/api/spaces/%s/prediction", spaceID), nil)
+	if err != nil {
+		return nil, err
+	}
+	var pred SpacePredictionData
+	if err := json.Unmarshal(data, &pred); err != nil {
+		return nil, err
+	}
+	if len(pred.RiskRegister) == 0 && len(pred.Prediction.RiskRegister) > 0 {
+		pred.RiskRegister = pred.Prediction.RiskRegister
+	}
+	if len(pred.UserLoads) == 0 && len(pred.Prediction.UserLoads) > 0 {
+		pred.UserLoads = pred.Prediction.UserLoads
+	}
+	return &pred, nil
+}
+
+func handleRisk(cfg Config, pctx *PathContext, args []string) {
+	spaceID := ""
+	if pctx.ActiveSpace != nil {
+		spaceID = pctx.ActiveSpace.ID
+	}
+	if spaceID == "" {
+		fmt.Printf("%sError:%s No active workspace selected. Use `cd @workspace` first.\n", colorRed, colorReset)
+		return
+	}
+
+	tasks, err := fetchSpaceTasks(cfg, spaceID)
+	if err != nil {
+		fmt.Printf("%sError fetching tasks:%s %v\n", colorRed, colorReset, err)
+		return
+	}
+
+	pred, err := fetchSpacePrediction(cfg, spaceID)
+	if err != nil || pred == nil || len(pred.RiskRegister) == 0 {
+		fmt.Printf("%sNo risk prediction snapshot available for this workspace yet (or AI opt-in disabled).%s\n", colorYellow, colorReset)
+		return
+	}
+
+	taskMap := make(map[string]Task)
+	for _, t := range tasks {
+		taskMap[t.ID] = t
+	}
+
+	// Subcommand: risk inspect <@task>
+	if len(args) > 0 && (args[0] == "inspect" || args[0] == "show") {
+		if len(args) < 2 {
+			fmt.Println("Usage: risk inspect <@task>")
+			return
+		}
+		targetID := resolveTaskID(args[1], tasks)
+		var item *RiskRegisterItem
+		for _, r := range pred.RiskRegister {
+			if r.ContainerID == targetID {
+				rCopy := r
+				item = &rCopy
+				break
+			}
+		}
+		if item == nil {
+			fmt.Printf("%sNo risk score recorded for task %s%s\n", colorYellow, args[1], colorReset)
+			return
+		}
+		tObj := taskMap[targetID]
+
+		levelColor := colorGreen
+		if strings.ToUpper(item.RiskLevel) == "H" || strings.ToUpper(item.RiskLevel) == "HIGH" {
+			levelColor = colorRed
+		} else if strings.ToUpper(item.RiskLevel) == "M" || strings.ToUpper(item.RiskLevel) == "MED" || strings.ToUpper(item.RiskLevel) == "MEDIUM" {
+			levelColor = colorYellow
+		}
+
+		fmt.Println()
+		fmt.Printf("┌─ %s[RISK DIAGNOSIS] %s%s (ID: %s) ───────────────────────────┐\n", colorGold+colorBold, tObj.DisplayTitle(), colorReset, tObj.ID)
+		fmt.Printf("│  Overall Rating      : %s[%s]%s (Prob: %.1f%% | Impact: %.1f)\n", levelColor+colorBold, strings.ToUpper(item.RiskLevel), colorReset, item.Likelihood*100, item.Impact)
+		if item.LGBMScore != nil {
+			fmt.Printf("│  LightGBM ML Score   : %.3f\n", *item.LGBMScore)
+		}
+		if item.P80Finish != nil && *item.P80Finish != "" {
+			fmt.Printf("│  P80 Finish Forecast : %s%s%s\n", colorCyan, *item.P80Finish, colorReset)
+		}
+		fmt.Println("├─────────────────────────────────────────────────────────────────────────────┤")
+		fmt.Println("│  PREDICTIVE SIGNALS (8-DIMENSION RADAR):")
+		fmt.Printf("│    • Critical Path Index : %.2f %s\n", item.Signals.Criticality, map[bool]string{true: "(On Critical Path)", false: ""}[item.Signals.Criticality > 0.5])
+		fmt.Printf("│    • Schedule Slip Ratio : %.2f days\n", item.Signals.Slip)
+		fmt.Printf("│    • Velocity Z-Score    : %.2f\n", item.Signals.VelZ)
+		fmt.Printf("│    • Overdue Flag        : %v\n", item.Signals.Overdue > 0)
+		fmt.Printf("│    • Scope Assigned      : %v\n", item.Signals.ScopeComplete)
+		fmt.Printf("│    • Cost Overrun Factor : %.2f\n", item.Signals.CostOverrun)
+		fmt.Printf("│    • Execution Stalls    : %d date pushes\n", item.Signals.Stalls)
+		fmt.Printf("│    • Downstream Blast    : %d dependent successors\n", item.Signals.Successors)
+		fmt.Println("├─────────────────────────────────────────────────────────────────────────────┤")
+		fmt.Println("│  ACTIONABLE MITIGATION:")
+		if item.Signals.Criticality > 0.5 && item.Signals.Successors > 2 {
+			fmt.Printf("│    %s⚠ HIGH BLAST RADIUS:%s Fast-track or assign co-owner to prevent cascade delays.\n", colorYellow, colorReset)
+		} else if item.Signals.Slip > 2.0 {
+			fmt.Printf("│    %s⚠ SCHEDULE SLIPPAGE:%s Re-baseline duration or trim dependent subtasks.\n", colorYellow, colorReset)
+		} else {
+			fmt.Printf("│    %s✓ NOMINAL STATUS:%s Track progress normally.\n", colorGreen, colorReset)
+		}
+		fmt.Println("└─────────────────────────────────────────────────────────────────────────────┘")
+		fmt.Println()
+		return
+	}
+
+	// Subcommand: risk top or risk ls
+	onlyTop := len(args) > 0 && args[0] == "top"
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+	fmt.Println()
+	fmt.Printf("%s=== RISK REGISTER (8-SIGNAL ML PREDICTIONS) ===%s\n", colorBold, colorReset)
+	fmt.Fprintln(w, "LEVEL\tPROB\tTASK ID\tPRIMARY DRIVER\tTITLE")
+
+	count := 0
+	for _, r := range pred.RiskRegister {
+		lvl := strings.ToUpper(r.RiskLevel)
+		if onlyTop && lvl != "H" && lvl != "HIGH" && lvl != "M" && lvl != "MED" && lvl != "MEDIUM" {
+			continue
+		}
+
+		color := colorGreen
+		if lvl == "H" || lvl == "HIGH" {
+			color = colorRed
+		} else if lvl == "M" || lvl == "MED" || lvl == "MEDIUM" {
+			color = colorYellow
+		}
+
+		driver := "Nominal"
+		if r.Signals.Criticality > 0.5 && r.Signals.Successors > 0 {
+			driver = fmt.Sprintf("Critical (%d succs)", r.Signals.Successors)
+		} else if r.Signals.Slip > 1.0 {
+			driver = fmt.Sprintf("Slip (+%.1fd)", r.Signals.Slip)
+		} else if r.Signals.Stalls > 1 {
+			driver = fmt.Sprintf("Stalls (%d pushes)", r.Signals.Stalls)
+		} else if r.Signals.Overdue > 0 {
+			driver = "Overdue"
+		}
+
+		tObj := taskMap[r.ContainerID]
+		title := tObj.DisplayTitle()
+		if len(title) > 36 {
+			title = title[:33] + "..."
+		}
+
+		fmt.Fprintf(w, "%s[%s]%s\t%.0f%%\t@%s\t%s\t%s\n", color, lvl, colorReset, r.Likelihood*100, r.ContainerID[:minInt(8, len(r.ContainerID))], driver, title)
+		count++
+	}
+	_ = w.Flush()
+	if count == 0 {
+		fmt.Println("  (No matching risk items)")
+	}
+	fmt.Println()
+}
+
+func handleWorkload(cfg Config, spaceID string) {
+	if spaceID == "" {
+		spaceID = cfg.SpaceID
+	}
+	if spaceID == "" {
+		fmt.Printf("%sError:%s No workspace selected. Use `cd @workspace` first.\n", colorRed, colorReset)
+		return
+	}
+
+	pred, err := fetchSpacePrediction(cfg, spaceID)
+	if err != nil || pred == nil || len(pred.UserLoads) == 0 {
+		fmt.Printf("%sNo cognitive load snapshot available for this workspace yet (or AI load opt-in disabled).%s\n", colorYellow, colorReset)
+		return
+	}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+	fmt.Println()
+	fmt.Printf("%s=== TEAM COGNITIVE LOAD INDEX ===%s\n", colorBold, colorReset)
+	fmt.Fprintln(w, "STATUS\tLOAD\tTASKS\tMEMBER")
+
+	for _, u := range pred.UserLoads {
+		status := fmt.Sprintf("%s[BALANCED]%s", colorGreen, colorReset)
+		if u.Overloaded || u.TotalLoadIndex >= 80 {
+			status = fmt.Sprintf("%s[OVERLOAD]%s", colorRed+colorBold, colorReset)
+		}
+
+		blocks := int(u.TotalLoadIndex / 10)
+		if blocks > 10 {
+			blocks = 10
+		}
+		bar := strings.Repeat("█", blocks) + strings.Repeat("░", 10-blocks)
+
+		name := u.UserName
+		if name == "" {
+			name = u.UserID
+		}
+
+		fmt.Fprintf(w, "%s\t%s %.1f/100\t%d active\t%s\n", status, bar, u.TotalLoadIndex, u.ActiveTaskCount, name)
+	}
+	_ = w.Flush()
+	fmt.Println()
+}
+
+func handleDispatch(cfg Config, pctx *PathContext, taskRef string, raw bool) {
+	spaceID := ""
+	if pctx.ActiveSpace != nil {
+		spaceID = pctx.ActiveSpace.ID
+	}
+	if spaceID == "" {
+		fmt.Printf("%sError:%s No active workspace selected. Use `cd @workspace` first.\n", colorRed, colorReset)
+		return
+	}
+
+	tasks, err := fetchSpaceTasks(cfg, spaceID)
+	if err != nil {
+		fmt.Printf("%sError fetching tasks:%s %v\n", colorRed, colorReset, err)
+		return
+	}
+
+	targetID := resolveTaskID(taskRef, tasks)
+	var targetTask *Task
+	for _, t := range tasks {
+		if t.ID == targetID {
+			tCopy := t
+			targetTask = &tCopy
+			break
+		}
+	}
+	if targetTask == nil {
+		fmt.Printf("%sTask '%s' not found%s\n", colorRed, taskRef, colorReset)
+		return
+	}
+
+	taskMap := make(map[string]Task)
+	for _, t := range tasks {
+		taskMap[t.ID] = t
+	}
+
+	ancestors := make(map[string]bool)
+	queue := []string{targetTask.ID}
+	visited := map[string]bool{targetTask.ID: true}
+
+	for len(queue) > 0 {
+		curr := queue[0]
+		queue = queue[1:]
+		if t, ok := taskMap[curr]; ok {
+			for _, predID := range t.Predecessors {
+				if !visited[predID] {
+					visited[predID] = true
+					ancestors[predID] = true
+					queue = append(queue, predID)
+				}
+			}
+		}
+	}
+
+	var relevant []Task
+	for aID := range ancestors {
+		if t, ok := taskMap[aID]; ok {
+			if t.Progress < 100 {
+				relevant = append(relevant, t)
+			}
+		}
+	}
+	relevant = append(relevant, *targetTask)
+
+	relSet := make(map[string]bool)
+	inDeg := make(map[string]int)
+	adj := make(map[string][]string)
+	for _, r := range relevant {
+		relSet[r.ID] = true
+		inDeg[r.ID] = 0
+		adj[r.ID] = []string{}
+	}
+	for _, r := range relevant {
+		for _, pid := range r.Predecessors {
+			if relSet[pid] {
+				adj[pid] = append(adj[pid], r.ID)
+				inDeg[r.ID]++
+			}
+		}
+	}
+
+	var topoQ []string
+	for _, r := range relevant {
+		if inDeg[r.ID] == 0 {
+			topoQ = append(topoQ, r.ID)
+		}
+	}
+
+	var chain []Task
+	for len(topoQ) > 0 {
+		currID := topoQ[0]
+		topoQ = topoQ[1:]
+		if t, ok := taskMap[currID]; ok {
+			chain = append(chain, t)
+		}
+		for _, neighbor := range adj[currID] {
+			inDeg[neighbor]--
+			if inDeg[neighbor] == 0 {
+				topoQ = append(topoQ, neighbor)
+			}
+		}
+	}
+
+	var finalChain []Task
+	for _, c := range chain {
+		if c.ID != targetTask.ID {
+			finalChain = append(finalChain, c)
+		}
+	}
+	finalChain = append(finalChain, *targetTask)
+
+	earliestStart := ""
+	latestFinish := ""
+	totalDays := 0.0
+	for _, c := range finalChain {
+		s := c.PlannedStart()
+		f := c.PlannedFinish()
+		totalDays += c.DurationDays
+		if s != "" && (earliestStart == "" || s < earliestStart) {
+			earliestStart = s
+		}
+		if f != "" && (latestFinish == "" || f > latestFinish) {
+			latestFinish = f
+		}
+	}
+
+	div := strings.Repeat("=", 80)
+	subDiv := strings.Repeat("-", 80)
+
+	fmt.Println()
+	fmt.Println(div)
+	fmt.Printf("                   SUNRAYPM OPERATIONAL DISPATCH SHEET\n")
+	fmt.Printf("                DETERMINISTIC TASK CHAIN & VERIFICATION\n")
+	fmt.Println(div)
+	orgName := "WORKSPACE"
+	if pctx.ActiveSpace != nil && pctx.ActiveSpace.TenantName != "" {
+		orgName = pctx.ActiveSpace.TenantName
+	}
+	spaceName := "GENERAL SPACE"
+	if pctx.ActiveSpace != nil {
+		spaceName = pctx.ActiveSpace.Name
+	}
+	fmt.Printf("  ORGANIZATION: %-24s SPACE:       %s\n", strings.ToUpper(orgName), strings.ToUpper(spaceName))
+	fmt.Printf("  DISPATCH ID : DSP-%-20s GENERATED:   %s UTC\n", targetTask.ID[:minInt(8, len(targetTask.ID))], time.Now().UTC().Format("2006-01-02 15:04"))
+	fmt.Printf("  TARGET TASK : %-24s HORIZON:     [%s] ──▶ [%s] (%.0fd)\n", targetTask.DisplayTitle(), earliestStart, latestFinish, totalDays)
+	fmt.Println(div)
+	fmt.Println("TASK EXECUTION CHECKLIST (TOPOLOGICAL ORDER):")
+	fmt.Println(subDiv)
+
+	for idx, item := range finalChain {
+		seq := fmt.Sprintf("%02d", idx+1)
+		status := fmt.Sprintf("[%3.0f%%]", item.Progress)
+		if item.Progress >= 100 {
+			status = "[  ✓ ]"
+		}
+		isTarget := item.ID == targetTask.ID
+		targetBadge := ""
+		if isTarget {
+			targetBadge = " [TARGET DESTINATION]"
+		}
+
+		fmt.Printf("  [ ] #%s %s %s%s\n", seq, status, item.DisplayTitle(), targetBadge)
+		fmt.Printf("      ID: @%s | Duration: %.0fd | Planned: %s ──▶ %s\n", item.ID[:minInt(8, len(item.ID))], item.DurationDays, item.PlannedStart(), item.PlannedFinish())
+		fmt.Println(subDiv)
+	}
+
+	fmt.Println()
+	fmt.Println("DISPATCHED BY: _____________________    EXECUTED BY: _____________________")
+	fmt.Println("SIGNATURE:     _____________________    SIGNATURE:   _____________________")
+	fmt.Println("DATE / TIME:   _____________________    VERIFIED BY: _____________________")
+	fmt.Println(div)
+	fmt.Println()
+}
+
+func handleShift(cfg Config, pctx *PathContext, deltaStr string, taskRefs []string) {
+	spaceID := ""
+	if pctx.ActiveSpace != nil {
+		spaceID = pctx.ActiveSpace.ID
+	}
+	if spaceID == "" {
+		fmt.Printf("%sError:%s No workspace selected. Use `cd @workspace` first.\n", colorRed, colorReset)
+		return
+	}
+	if len(taskRefs) == 0 {
+		fmt.Println("Usage: shift <+Nd|-Nd> <@task1> [@task2...]")
+		return
+	}
+
+	cleanDelta := strings.TrimSuffix(deltaStr, "d")
+	days, err := strconv.Atoi(cleanDelta)
+	if err != nil {
+		fmt.Printf("%sInvalid day shift '%s' (example: +7d or -3d)%s\n", colorRed, deltaStr, colorReset)
+		return
+	}
+
+	tasks, err := fetchSpaceTasks(cfg, spaceID)
+	if err != nil {
+		fmt.Printf("%sError:%s %v\n", colorRed, colorReset, err)
+		return
+	}
+
+	tenantID := ""
+	if pctx.ActiveSpace != nil {
+		tenantID = pctx.ActiveSpace.TenantID
+	}
+
+	for _, ref := range taskRefs {
+		targetID := resolveTaskID(ref, tasks)
+		var target *Task
+		for _, t := range tasks {
+			if t.ID == targetID {
+				tCopy := t
+				target = &tCopy
+				break
+			}
+		}
+		if target == nil {
+			fmt.Printf("%sTask %s not found%s\n", colorYellow, ref, colorReset)
+			continue
+		}
+
+		startStr := target.PlannedStart()
+		finishStr := target.PlannedFinish()
+
+		payload := map[string]interface{}{
+			"id":        target.ID,
+			"space_id":  spaceID,
+			"tenant_id": tenantID,
+		}
+
+		if startStr != "" {
+			if st, err := time.Parse("2006-01-02", startStr); err == nil {
+				newSt := st.AddDate(0, 0, days).Format("2006-01-02T15:04:05Z07:00")
+				payload["start_date_planned"] = newSt
+			}
+		}
+		if finishStr != "" {
+			if fn, err := time.Parse("2006-01-02", finishStr); err == nil {
+				newFn := fn.AddDate(0, 0, days).Format("2006-01-02T15:04:05Z07:00")
+				payload["finish_date_planned"] = newFn
+			}
+		}
+
+		_, err := makeRequest(cfg, "PUT", "/api/containers", payload)
+		if err != nil {
+			fmt.Printf("%sFailed to shift %s:%s %v\n", colorRed, target.DisplayTitle(), colorReset, err)
+		} else {
+			fmt.Printf("%s✓ Shifted %s by %+dd%s\n", colorGreen, target.DisplayTitle(), days, colorReset)
+		}
+	}
+}
+
+func handleBulk(cfg Config, pctx *PathContext, action string, taskRefs []string) {
+	spaceID := ""
+	if pctx.ActiveSpace != nil {
+		spaceID = pctx.ActiveSpace.ID
+	}
+	if spaceID == "" {
+		fmt.Printf("%sError:%s No workspace selected. Use `cd @workspace` first.\n", colorRed, colorReset)
+		return
+	}
+	if len(taskRefs) == 0 {
+		fmt.Println("Usage: bulk <done|reopen|rm> <@task1> [@task2...]")
+		return
+	}
+
+	tasks, err := fetchSpaceTasks(cfg, spaceID)
+	if err != nil {
+		fmt.Printf("%sError:%s %v\n", colorRed, colorReset, err)
+		return
+	}
+
+	for _, ref := range taskRefs {
+		targetID := resolveTaskID(ref, tasks)
+		switch action {
+		case "done":
+			handleDone(cfg, pctx, "@"+targetID)
+		case "reopen":
+			handleChmod(cfg, pctx, "0", "@"+targetID)
+		case "rm", "delete":
+			handleRm(cfg, pctx, []string{"@" + targetID})
+		default:
+			fmt.Printf("Unknown bulk action '%s'. Supported: done, reopen, rm\n", action)
+			return
+		}
+	}
+}
+
+func handleExport(cfg Config, pctx *PathContext, target string, format string) {
+	if target == "user" || target == "gdpr" {
+		data, err := makeRequest(cfg, "GET", "/api/user/export", nil)
+		if err != nil {
+			fmt.Printf("%sFailed to export user archive:%s %v\n", colorRed, colorReset, err)
+			return
+		}
+		var pretty bytes.Buffer
+		_ = json.Indent(&pretty, data, "", "  ")
+		fmt.Println(pretty.String())
+		return
+	}
+
+	spaceID := ""
+	if pctx.ActiveSpace != nil {
+		spaceID = pctx.ActiveSpace.ID
+	}
+	if spaceID == "" {
+		fmt.Printf("%sError:%s No active workspace selected. Use `cd @workspace` first.\n", colorRed, colorReset)
+		return
+	}
+
+	tasks, err := fetchSpaceTasks(cfg, spaceID)
+	if err != nil {
+		fmt.Printf("%sError:%s %v\n", colorRed, colorReset, err)
+		return
+	}
+
+	if format == "json" {
+		out, _ := json.MarshalIndent(tasks, "", "  ")
+		fmt.Println(string(out))
+		return
+	}
+
+	handleReport(cfg, spaceID)
+}
+
 func printHelp() {
 	fmt.Printf("%s[sunRayPM] Unix-Standard CLI Developer Tool%s\n\n", colorGold+colorBold, colorReset)
 	fmt.Println("Navigation & Virtual FS:")
@@ -2296,6 +2908,13 @@ func printHelp() {
 	fmt.Println("  done <@task>                            Mark task completed (100%)")
 	fmt.Println("  chmod <pct> <@task>                     Set task progress percentage")
 	fmt.Println("  echo \"note\" >> <@task>                  Append note/comment to task")
+	fmt.Println("  shift <+Nd|-Nd> <@task...>              Batch shift planned dates")
+	fmt.Println("  bulk <done|reopen|rm> <@task...>        Batch execute task operations")
+	fmt.Println()
+	fmt.Println("Cognitive & Operational Intelligence:")
+	fmt.Println("  risk [ls|top|inspect <@task>]     8-signal predictive ML risk register & radar")
+	fmt.Println("  workload                          Team cognitive load index & overload triage")
+	fmt.Println("  dispatch <@task>                  Aviation-style OFP operational dispatch sheet")
 	fmt.Println()
 	fmt.Println("Institutional Management & Agile:")
 	fmt.Println("  evm                               Earned Value Management (BAC, PV, EV, AC, CPI, SPI)")
@@ -2306,6 +2925,7 @@ func printHelp() {
 	fmt.Println("  scurve                            Cumulative spend and schedule curve")
 	fmt.Println("  raci <@container>                 RACI responsibility matrix")
 	fmt.Println("  audit, report                     Generate Executive Markdown report")
+	fmt.Println("  export [space|user] [--json|--md] GDPR & workspace export")
 	fmt.Println()
 	fmt.Println("Search & System:")
 	fmt.Println("  grep <query>                      Search tasks by keyword")
@@ -2441,6 +3061,45 @@ func executeREPLCommand(cfg *Config, pctx *PathContext, input string) {
 		} else {
 			fmt.Println("Usage: chmod <progress_pct> <@task>")
 		}
+	case "shift":
+		if len(args) > 2 {
+			handleShift(*cfg, pctx, args[1], args[2:])
+		} else {
+			fmt.Println("Usage: shift <+Nd|-Nd> <@task1> [@task2...]")
+		}
+	case "bulk", "batch":
+		if len(args) > 2 {
+			handleBulk(*cfg, pctx, args[1], args[2:])
+		} else {
+			fmt.Println("Usage: bulk <done|reopen|rm> <@task1> [@task2...]")
+		}
+
+	// Cognitive & Operational Intelligence
+	case "risk", "hml", "triage":
+		handleRisk(*cfg, pctx, args[1:])
+	case "workload", "load":
+		spaceID := ""
+		if pctx.ActiveSpace != nil {
+			spaceID = pctx.ActiveSpace.ID
+		}
+		handleWorkload(*cfg, spaceID)
+	case "dispatch", "ofp":
+		if len(args) > 1 {
+			raw := len(args) > 2 && (args[2] == "--raw" || args[2] == "-r")
+			handleDispatch(*cfg, pctx, args[1], raw)
+		} else {
+			fmt.Println("Usage: dispatch <@task> [--raw]")
+		}
+	case "export":
+		target := "space"
+		if len(args) > 1 {
+			target = args[1]
+		}
+		format := "md"
+		if len(args) > 2 && (args[2] == "--json" || args[2] == "-j" || args[2] == "json") {
+			format = "json"
+		}
+		handleExport(*cfg, pctx, target, format)
 
 	// Institutional Management
 	case "evm", "df":
