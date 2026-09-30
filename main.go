@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -90,6 +91,8 @@ type Task struct {
 	ParentID          *string  `json:"parent_id,omitempty"`
 	Assignees         []string `json:"assignees,omitempty"`
 	Predecessors      []string `json:"predecessors,omitempty"`
+	IsCritical        bool     `json:"is_critical,omitempty"`
+	CriticalityIndex  float64  `json:"criticality_index,omitempty"`
 }
 
 func (t Task) DisplayTitle() string {
@@ -2694,6 +2697,34 @@ func handleDispatch(cfg Config, pctx *PathContext, taskRef string, raw bool) {
 	div := strings.Repeat("=", 80)
 	subDiv := strings.Repeat("-", 80)
 
+	// Compute DAG depth for multi-level tree
+	chainIDSet := make(map[string]bool)
+	for _, c := range finalChain {
+		chainIDSet[c.ID] = true
+	}
+	depthMap := make(map[string]int)
+	for _, task := range finalChain {
+		maxPredDepth := -1
+		for _, pid := range task.Predecessors {
+			if chainIDSet[pid] {
+				d := depthMap[pid]
+				if d > maxPredDepth {
+					maxPredDepth = d
+				}
+			}
+		}
+		if maxPredDepth == -1 {
+			depthMap[task.ID] = 0
+		} else {
+			depthMap[task.ID] = maxPredDepth + 1
+		}
+	}
+
+	depths := make([]int, len(finalChain))
+	for i, task := range finalChain {
+		depths[i] = depthMap[task.ID]
+	}
+
 	fmt.Println()
 	fmt.Println(div)
 	fmt.Printf("                   SUNRAYPM OPERATIONAL DISPATCH SHEET\n")
@@ -2710,6 +2741,86 @@ func handleDispatch(cfg Config, pctx *PathContext, taskRef string, raw bool) {
 	fmt.Printf("  ORGANIZATION: %-24s SPACE:       %s\n", strings.ToUpper(orgName), strings.ToUpper(spaceName))
 	fmt.Printf("  DISPATCH ID : DSP-%-20s GENERATED:   %s UTC\n", targetTask.ID[:minInt(8, len(targetTask.ID))], time.Now().UTC().Format("2006-01-02 15:04"))
 	fmt.Printf("  TARGET TASK : %-24s HORIZON:     [%s] ──▶ [%s] (%.0fd)\n", targetTask.DisplayTitle(), earliestStart, latestFinish, totalDays)
+	fmt.Println(div)
+
+	fmt.Println("DEPENDENCY GRAPH (EXECUTION ORDER):")
+	for idx, item := range finalChain {
+		d := depths[idx]
+		isTarget := item.ID == targetTask.ID
+		seq := fmt.Sprintf("%02d", idx+1)
+		title := item.DisplayTitle()
+		progress := int(math.Round(item.Progress))
+
+		prefix := ""
+		if d == 0 {
+			if idx == 0 {
+				if len(finalChain) == 1 {
+					prefix = "─── "
+				} else {
+					prefix = "┌── "
+				}
+			} else {
+				hasLaterRoot := false
+				for j := idx + 1; j < len(depths); j++ {
+					if depths[j] == 0 {
+						hasLaterRoot = true
+						break
+					}
+				}
+				if hasLaterRoot {
+					prefix = "├── "
+				} else {
+					prefix = "└── "
+				}
+			}
+		} else {
+			cols := ""
+			for k := 0; k < d; k++ {
+				if k == d-1 {
+					hasLaterSibling := false
+					for j := idx + 1; j < len(depths); j++ {
+						if depths[j] < d {
+							break
+						}
+						if depths[j] == d {
+							hasLaterSibling = true
+							break
+						}
+					}
+					if hasLaterSibling {
+						cols += "├──► "
+					} else {
+						cols += "└──► "
+					}
+				} else {
+					colActive := false
+					for j := idx + 1; j < len(depths); j++ {
+						if depths[j] <= k {
+							colActive = true
+							break
+						}
+					}
+					if colActive {
+						cols += "│    "
+					} else {
+						cols += "     "
+					}
+				}
+			}
+			prefix = cols
+		}
+
+		targetTag := ""
+		if isTarget {
+			targetTag = " [TARGET DESTINATION]"
+		}
+		critTag := ""
+		if item.IsCritical || item.CriticalityIndex > 0.5 {
+			critTag = " [CRITICAL]"
+		}
+		fmt.Printf("  %s[%s] %s (%d%%)%s%s\n", prefix, seq, title, progress, critTag, targetTag)
+	}
+	fmt.Println()
 	fmt.Println(div)
 	fmt.Println("TASK EXECUTION CHECKLIST (TOPOLOGICAL ORDER):")
 	fmt.Println(subDiv)
@@ -2728,6 +2839,16 @@ func handleDispatch(cfg Config, pctx *PathContext, taskRef string, raw bool) {
 
 		fmt.Printf("  [ ] #%s %s %s%s\n", seq, status, item.DisplayTitle(), targetBadge)
 		fmt.Printf("      ID: @%s | Duration: %.0fd | Planned: %s ──▶ %s\n", item.ID[:minInt(8, len(item.ID))], item.DurationDays, item.PlannedStart(), item.PlannedFinish())
+		if strings.TrimSpace(item.Description) != "" {
+			descLines := strings.Split(strings.TrimSpace(item.Description), "\n")
+			for lIdx, dLine := range descLines {
+				if lIdx == 0 {
+					fmt.Printf("      Notes: %s\n", dLine)
+				} else {
+					fmt.Printf("             %s\n", dLine)
+				}
+			}
+		}
 		fmt.Println(subDiv)
 	}
 
