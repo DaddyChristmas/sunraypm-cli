@@ -100,8 +100,17 @@ Typing a specific task reference (e.g. `@0dca36` or `cat @0dca36`) renders the f
 | **`done`** | `done <@task>` | Quickly mark task 100% completed |
 | **`chmod`** | `chmod <0-100> <@task>` | Set task progress percentage |
 | **`echo`** | `echo "note" >> <@task>` | Append note or description to task |
+| **`shift`** | `shift <+Nd|-Nd> <@task1> [@task2...]` | Batch shift planned task schedules forward or backward by N days |
+| **`bulk`** | `bulk <done|reopen|rm> <@task1> [@task2...]` | Batch execute task operations simultaneously |
 
-### 3. Institutional Management & Analytics
+### 3. Cognitive & Operational Intelligence
+| Command | Syntax | Description |
+| :--- | :--- | :--- |
+| **`risk`** / **`hml`** | `risk [ls|top|inspect <@task>]` | 8-signal predictive ML risk register & failure diagnostics |
+| **`workload`** / **`load`** | `workload` | Team cognitive load indices & overload saturation triage |
+| **`dispatch`** / **`ofp`** | `dispatch <@task> [--raw]` | Aviation-style operational task chain flight plan with multi-level DAG tree |
+
+### 4. Institutional Management & Analytics
 | Command | Syntax | Description |
 | :--- | :--- | :--- |
 | **`evm`** / **`df`** | `evm` | Real-time Earned Value Management (BAC, PV, EV, AC, CPI, SPI, EAC, VAC) |
@@ -112,6 +121,7 @@ Typing a specific task reference (e.g. `@0dca36` or `cat @0dca36`) renders the f
 | **`burndown`** | `burndown` | ASCII sprint burndown trajectory chart |
 | **`raci`** | `raci <@container>` | Render RACI Responsibility Assignment Matrix |
 | **`audit`** / **`report`** | `report` | Generate 1-Click Executive Markdown project report |
+| **`export`** | `export [space|user] [--json|--md]` | GDPR Article 20 archive & workspace export |
 
 ### 4. Search, Utilities & Diagnostics
 | Command | Syntax | Description |
